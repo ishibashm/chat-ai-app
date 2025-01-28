@@ -1,0 +1,173 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background-dark: #1a1a1a;
+  --background-darker: #141414;
+  --text-primary: #ffffff;
+  --text-secondary: #a0a0a0;
+  --border-color: #2a2a2a;
+  --accent-color: #0ea5e9;
+  --hover-color: #1e293b;
+  --math-background: #1e293b;
+}
+
+body {
+  background-color: var(--background-dark);
+  color: var(--text-primary);
+}
+
+/* 数式のスタイル */
+.math-block-wrapper {
+  margin: 1.5rem 0;
+  padding: 1.5rem;
+  background-color: var(--math-background);
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  position: relative;
+}
+
+.math-block-content {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 2rem;
+}
+
+.math-block .katex-display {
+  margin: 0;
+}
+
+.math-inline .katex {
+  font-size: 1.1em;
+}
+
+.katex-display > .katex {
+  font-size: 1.21em;
+}
+
+.katex {
+  text-rendering: auto;
+  font-size: 1.1em;
+  color: var(--text-primary);
+}
+
+/* 見出しのスタイル */
+.section-heading {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.subsection-heading {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+/* プロースのスタイル */
+.prose {
+  color: var(--text-primary) !important;
+  max-width: none !important;
+}
+
+.prose pre {
+  background-color: var(--background-darker);
+  border: 1px solid var(--border-color);
+  margin: 0;
+  padding: 0;
+}
+
+.prose code {
+  color: var(--accent-color);
+  background-color: var(--background-darker);
+  padding: 0.2em 0.4em;
+  border-radius: 0.25rem;
+  font-size: 0.875em;
+}
+
+.prose a {
+  color: var(--accent-color);
+  text-decoration: none;
+}
+
+.prose a:hover {
+  text-decoration: underline;
+}
+
+.prose strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.prose em {
+  color: var(--text-secondary);
+}
+
+.prose ul {
+  list-style-type: disc;
+  padding-left: 1.5em;
+}
+
+.prose ol {
+  list-style-type: decimal;
+  padding-left: 1.5em;
+}
+
+.prose li {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+.prose blockquote {
+  border-left-color: var(--border-color);
+  color: var(--text-secondary);
+}
+
+.prose hr {
+  border-color: var(--border-color);
+}
+
+.prose img {
+  border-radius: 0.5rem;
+  margin: 1rem 0;
+}
+
+/* スクロールバーのスタイル */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background-darker);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
+/* アニメーション */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
