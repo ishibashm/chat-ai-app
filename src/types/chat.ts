@@ -55,3 +55,23 @@ export interface ChatContext {
 export interface DeleteChatOptions {
   deleteChildren?: boolean;
 }
+
+// エクスポート/インポート関連の型定義
+export interface ChatExportData {
+  version: string;
+  exportedAt: number;
+  chats: Chat[];
+  settings: ChatSettings;
+}
+
+export interface ChatImportResult {
+  success: boolean;
+  importedChatsCount: number;
+  error?: string;
+  duplicateChats?: string[]; // 重複するチャットのID
+}
+
+export interface ChatExportOptions {
+  includeSettings?: boolean;
+  selectedChatIds?: string[]; // 特定のチャットのみエクスポートする場合
+}

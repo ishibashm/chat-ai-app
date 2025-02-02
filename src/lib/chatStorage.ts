@@ -1,4 +1,4 @@
-import { Chat, ModelType, DeleteChatOptions } from '../types/chat';
+import { Chat, ModelType, DeleteChatOptions, ChatExportData, ChatImportResult, ChatExportOptions, ChatSettings, DEFAULT_SETTINGS } from '../types/chat';
 
 export function generateChatId(): string {
   return Math.random().toString(36).substring(2, 15);
@@ -135,4 +135,120 @@ export function deleteChat(chatId: string, chats: Chat[], options: DeleteChatOpt
     );
     return updatedChats.filter(chat => chat.id !== chatId);
   }
+}
+
+// エクスポート機能
+export function exportChats(chats: Chat[], options: ChatExportOptions = {}): ChatExportData {
+  const selectedChats = options.selectedChatIds
+    ? chats.filter(chat => options.selectedChatIds?.includes(chat.id))
+    : chats;
+
+  const exportData: ChatExportData = {
+    version: '1.0.0',
+    exportedAt: Date.now(),
+    chats: selectedChats,
+    settings: options.includeSettings 
+      ? (localStorage.getItem('chatSettings') 
+          ? JSON.parse(localStorage.getItem('chatSettings')!) 
+          : DEFAULT_SETTINGS)
+      : DEFAULT_SETTINGS,
+  };
+
+  return exportData;
+}
+
+// JSONファイルとしてエクスポート
+export function downloadChatsAsJson(exportData: ChatExportData): void {
+  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `chat-export-${formatDate(Date.now())}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+interface ImportOptions {
+  keepExisting?: boolean;
+}
+
+// インポート機能
+export function importChats(importData: unknown, options: ImportOptions = {}): ChatImportResult {
+  try {
+    // 型チェック
+    if (!isValidChatExportData(importData)) {
+      return {
+        success: false,
+        importedChatsCount: 0,
+        error: '無効なインポートデータ形式です',
+      };
+    }
+
+    // 既存のチャットを読み込み
+    const existingChats = options.keepExisting ? loadChatsFromLocalStorage() : [];
+    const existingIds = new Set(existingChats.map(chat => chat.id));
+    const duplicateChats: string[] = [];
+
+    // 重複チェックと新しいIDの生成
+    const processedChats = importData.chats.map(chat => {
+      if (existingIds.has(chat.id)) {
+        duplicateChats.push(chat.id);
+        // 新しいIDを生成
+        const newId = generateChatId();
+        return {
+          ...chat,
+          id: newId,
+          parentId: undefined, // 親子関係はリセット
+          contextIds: [], // コンテキスト関係もリセット
+        };
+      }
+      return chat;
+    });
+
+    // チャットを保存
+    const updatedChats = options.keepExisting
+      ? [...existingChats, ...processedChats]
+      : processedChats;
+    saveChatsToLocalStorage(updatedChats);
+
+    // 設定のインポート(オプション)
+    if (importData.settings) {
+      localStorage.setItem('chatSettings', JSON.stringify(importData.settings));
+    }
+
+    return {
+      success: true,
+      importedChatsCount: processedChats.length,
+      duplicateChats: duplicateChats.length > 0 ? duplicateChats : undefined,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      importedChatsCount: 0,
+      error: error instanceof Error ? error.message : '不明なエラーが発生しました',
+    };
+  }
+}
+
+// インポートデータの型チェック
+function isValidChatExportData(data: any): data is ChatExportData {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    typeof data.version === 'string' &&
+    typeof data.exportedAt === 'number' &&
+    Array.isArray(data.chats) &&
+    data.chats.every((chat: any) =>
+      typeof chat === 'object' &&
+      chat !== null &&
+      typeof chat.id === 'string' &&
+      typeof chat.title === 'string' &&
+      Array.isArray(chat.messages) &&
+      typeof chat.model === 'string' &&
+      typeof chat.createdAt === 'number' &&
+      typeof chat.updatedAt === 'number'
+    )
+  );
 }
