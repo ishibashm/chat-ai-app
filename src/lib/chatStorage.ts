@@ -170,8 +170,12 @@ export function downloadChatsAsJson(exportData: ChatExportData): void {
   URL.revokeObjectURL(url);
 }
 
+interface ImportOptions {
+  keepExisting?: boolean;
+}
+
 // インポート機能
-export function importChats(importData: unknown): ChatImportResult {
+export function importChats(importData: unknown, options: ImportOptions = {}): ChatImportResult {
   try {
     // 型チェック
     if (!isValidChatExportData(importData)) {
@@ -183,7 +187,7 @@ export function importChats(importData: unknown): ChatImportResult {
     }
 
     // 既存のチャットを読み込み
-    const existingChats = loadChatsFromLocalStorage();
+    const existingChats = options.keepExisting ? loadChatsFromLocalStorage() : [];
     const existingIds = new Set(existingChats.map(chat => chat.id));
     const duplicateChats: string[] = [];
 
@@ -204,7 +208,9 @@ export function importChats(importData: unknown): ChatImportResult {
     });
 
     // チャットを保存
-    const updatedChats = [...existingChats, ...processedChats];
+    const updatedChats = options.keepExisting
+      ? [...existingChats, ...processedChats]
+      : processedChats;
     saveChatsToLocalStorage(updatedChats);
 
     // 設定のインポート(オプション)

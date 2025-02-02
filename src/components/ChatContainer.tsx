@@ -249,9 +249,12 @@ export const ChatContainer: React.FC = () => {
 
   // エクスポート機能
   const handleExportChats = () => {
+    const currentChat = getCurrentChat();
+    if (!currentChat) return;
+
     const exportData = exportChats(chatState.chats, {
       includeSettings: true,
-      selectedChatIds: chatState.currentChatId ? [chatState.currentChatId] : undefined,
+      selectedChatIds: [currentChat.id],
     });
     downloadChatsAsJson(exportData);
   };
@@ -282,7 +285,7 @@ export const ChatContainer: React.FC = () => {
         const importData = JSON.parse(e.target.result);
         console.log('Parsed data:', importData); // デバッグ用にパースされたデータを出力
 
-        const result = importChats(importData);
+        const result = importChats(importData, { keepExisting: false });
         console.log('Import result:', result); // デバッグ用にインポート結果を出力
         
         if (result.success) {
@@ -328,6 +331,7 @@ export const ChatContainer: React.FC = () => {
           <button
             onClick={handleExportChats}
             className="flex-1 px-3 py-1.5 bg-[#1e293b] text-white rounded hover:bg-[#2d3a4f] transition-colors text-sm"
+            disabled={!currentChat}
           >
             エクスポート
           </button>
