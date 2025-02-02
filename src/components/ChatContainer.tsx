@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { ChatTitle } from './ChatTitle';
-import { Chat, ChatState, Message, ModelType, ChatSettings, DEFAULT_SETTINGS } from '../types/chat';
+import { Chat, ChatState, Message, ModelType, ChatSettings, DEFAULT_SETTINGS, ChatImportResult } from '../types/chat';
 import { generateChatResponse } from '../lib/openai';
 import {
   createNewChat,
@@ -15,6 +15,9 @@ import {
   formatDate,
   deleteChat,
   getChildChats,
+  exportChats,
+  downloadChatsAsJson,
+  importChats,
 } from '../lib/chatStorage';
 import {
   getRelatedContext,
@@ -32,9 +35,11 @@ export const ChatContainer: React.FC = () => {
   const [streamingContent, setStreamingContent] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState<ChatSettings>(DEFAULT_SETTINGS);
+  const [importError, setImportError] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const loadedChats = loadChatsFromLocalStorage();
@@ -163,7 +168,7 @@ export const ChatContainer: React.FC = () => {
       updatedAt: Date.now(),
     };
 
-    // チャットタイトルの自動生成（最初のメッセージの場合）
+    // チャットタイトルの自動生成(最初のメッセージの場合)
     if (currentChat.messages.length === 0) {
       const title = await generateChatTitle(content);
       updatedChat.title = title;
@@ -242,6 +247,71 @@ export const ChatContainer: React.FC = () => {
     }
   };
 
+  // エクスポート機能
+  const handleExportChats = () => {
+    const exportData = exportChats(chatState.chats, {
+      includeSettings: true,
+      selectedChatIds: chatState.currentChatId ? [chatState.currentChatId] : undefined,
+    });
+    downloadChatsAsJson(exportData);
+  };
+
+  // インポート機能
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    
+    reader.onerror = () => {
+      console.error('FileReader error:', reader.error);
+      setImportError('ファイルの読み込み中にエラーが発生しました。');
+    };
+
+    reader.onload = (e) => {
+      try {
+        if (typeof e.target?.result !== 'string') {
+          throw new Error('ファイルの内容が不正です。');
+        }
+
+        console.log('File content:', e.target.result.slice(0, 100)); // デバッグ用に内容の一部を出力
+        const importData = JSON.parse(e.target.result);
+        console.log('Parsed data:', importData); // デバッグ用にパースされたデータを出力
+
+        const result = importChats(importData);
+        console.log('Import result:', result); // デバッグ用にインポート結果を出力
+        
+        if (result.success) {
+          // インポート成功後、チャット一覧を更新
+          const loadedChats = loadChatsFromLocalStorage();
+          setChatState(prev => ({
+            ...prev,
+            chats: loadedChats,
+            currentChatId: loadedChats[0]?.id || null,
+          }));
+          setImportError(null);
+          
+          // 重複チャットの警告
+          if (result.duplicateChats?.length) {
+            setImportError(`${result.duplicateChats.length}件のチャットが重複していたため、新しいIDで保存されました。`);
+          }
+        } else {
+          setImportError(result.error || 'インポートに失敗しました。');
+        }
+      } catch (error) {
+        console.error('Import error:', error); // デバッグ用にエラーを出力
+        setImportError(error instanceof Error ? error.message : 'ファイルの解析に失敗しました。');
+      }
+    };
+
+    reader.readAsText(file);
+    event.target.value = ''; // ファイル選択をリセット
+  };
+
   const currentChat = getCurrentChat();
 
   return (
@@ -254,6 +324,32 @@ export const ChatContainer: React.FC = () => {
         >
           New Chat
         </button>
+        <div className="flex gap-2 mb-4">
+          <button
+            onClick={handleExportChats}
+            className="flex-1 px-3 py-1.5 bg-[#1e293b] text-white rounded hover:bg-[#2d3a4f] transition-colors text-sm"
+          >
+            エクスポート
+          </button>
+          <button
+            onClick={handleImportClick}
+            className="flex-1 px-3 py-1.5 bg-[#1e293b] text-white rounded hover:bg-[#2d3a4f] transition-colors text-sm"
+          >
+            インポート
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json"
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+        </div>
+        {importError && (
+          <div className="mb-4 p-2 text-xs bg-red-500/10 border border-red-500/50 rounded text-red-400">
+            {importError}
+          </div>
+        )}
         <div className="space-y-2">
           {chatState.chats.map(chat => (
             <ChatTitle
