@@ -35,7 +35,7 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ language, value }) => {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
-              <span>Copied!</span>
+              <span>コピーしました</span>
             </>
           ) : (
             <>
@@ -47,7 +47,7 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ language, value }) => {
                   d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"
                 />
               </svg>
-              <span>Copy</span>
+              <span>コピー</span>
             </>
           )}
         </button>
@@ -74,8 +74,14 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ language, value }) => {
             backgroundColor: '#1a1a1a',
             marginRight: '1em',
             borderRight: '1px solid #2a2a2a',
+            userSelect: 'none',
           }}
-          className="!bg-[#141414] !p-4"
+          codeTagProps={{
+            style: {
+              fontFamily: 'JetBrains Mono, Consolas, Monaco, monospace',
+            },
+          }}
+          className="!bg-[#141414] !p-4 !overflow-x-auto"
         >
           {value}
         </SyntaxHighlighter>

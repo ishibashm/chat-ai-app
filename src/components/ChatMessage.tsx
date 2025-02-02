@@ -11,40 +11,9 @@ interface ChatMessageProps {
 export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
   const isUser = message.role === 'user';
 
-  // テキスト内の数式を処理
+  // テキスト内の数式のみを処理
   const processText = (text: string) => {
-    const codeBlockRegex = /```(\w+)?\n([\s\S]+?)```/g;
-    const parts: (string | React.ReactElement)[] = [];
-    let lastIndex = 0;
-
-    text.replace(codeBlockRegex, (match, language, code, index) => {
-      if (index > lastIndex) {
-        // コードブロック前のテキストを数式処理して追加
-        const textBefore = text.slice(lastIndex, index);
-        parts.push(...renderMathInText(textBefore));
-      }
-      // コードブロックを追加
-      parts.push(
-        <div key={index} className="my-4">
-          <div className="flex items-center bg-[#1a1a1a] px-4 py-2 rounded-t-lg border-b border-[#2a2a2a]">
-            <span className="text-xs text-[#666]">{language || 'text'}</span>
-          </div>
-          <CodeBlock
-            language={language || 'text'}
-            value={code.trim()}
-          />
-        </div>
-      );
-      lastIndex = index + match.length;
-      return match;
-    });
-
-    // 残りのテキストを数式処理して追加
-    if (lastIndex < text.length) {
-      const remainingText = text.slice(lastIndex);
-      parts.push(...renderMathInText(remainingText));
-    }
-
+    const parts = renderMathInText(text);
     return parts;
   };
 
@@ -57,7 +26,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
             : 'bg-[#1e293b] text-[#e2e8f0]'
         }`}
       >
-        {/* メッセージヘッダー（AIの応答の場合のみ） */}
+        {/* メッセージヘッダー(AIの応答の場合のみ) */}
         {!isUser && (
           <div className="px-4 py-2 border-b border-[#2a2a2a] flex items-center">
             <div className="w-2 h-2 rounded-full bg-green-400 mr-2" />
@@ -72,19 +41,27 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
             components={{
               // インラインコードの処理
               code: ({ inline, className, children, ...props }) => {
+                const language = className ? className.replace('language-', '') : 'text';
+                const value = String(children).replace(/\n$/, '');
+
                 if (inline) {
                   return (
                     <code
                       className="bg-[#1a1a1a] text-[#0ea5e9] px-1.5 py-0.5 rounded text-sm font-mono"
                       {...props}
                     >
-                      {children}
+                      {value}
                     </code>
                   );
                 }
-                return null;
+
+                return (
+                  <div className="my-4">
+                    <CodeBlock language={language} value={value} />
+                  </div>
+                );
               },
-              // 段落の処理（数式とコードブロックの処理を含む）
+              // 段落の処理(数式の処理)
               p: ({ children }) => {
                 if (typeof children === 'string') {
                   const processed = processText(children);
