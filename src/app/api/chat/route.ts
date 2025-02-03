@@ -90,6 +90,43 @@ async function* streamClaudeResponse(messages: Message[]) {
   }
 }
 
+async function* streamGeminiResponse(messages: Message[], request: Request) {
+  try {
+    const url = new URL(request.url);
+    const geminiUrl = new URL('/api/chat/gemini', url.origin);
+    const response = await fetch(geminiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ messages }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Gemini API failed: ${response.status} ${response.statusText}`);
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) throw new Error('Response body is null');
+
+    try {
+      const decoder = new TextDecoder();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        yield chunk;
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  } catch (error) {
+    console.error('Gemini streaming error:', error);
+    throw error;
+  }
+}
+
 function getModelName(model: ModelType): string {
   switch (model) {
     case 'gpt-4':
@@ -100,6 +137,8 @@ function getModelName(model: ModelType): string {
       return 'gpt-3.5-turbo';
     case 'claude':
       return 'claude-3-opus-20240229';
+    case 'gemini-pro':
+      return 'gemini-pro';
     default:
       return 'gpt-4-0125-preview';
   }
@@ -107,21 +146,19 @@ function getModelName(model: ModelType): string {
 
 export async function POST(request: Request) {
   const encoder = new TextEncoder();
-  let controller: ReadableStreamDefaultController | null = null;
 
   try {
     const { messages, model } = await request.json();
     const modelName = getModelName(model as ModelType);
 
-    const stream = new ReadableStream({
-      start(c) {
-        controller = c;
-      },
-      async pull(controller) {
+    const stream = new ReadableStream<Uint8Array>({
+      async start(controller) {
         try {
           let generator;
           if (model === 'claude') {
             generator = streamClaudeResponse(messages);
+          } else if (model === 'gemini-pro') {
+            generator = streamGeminiResponse(messages, request);
           } else {
             generator = streamOpenAIResponse(messages, modelName);
           }
@@ -134,16 +171,7 @@ export async function POST(request: Request) {
           console.error('Streaming error:', error);
           controller.error(error);
         }
-      },
-      cancel() {
-        if (controller) {
-          try {
-            controller.close();
-          } catch (e) {
-            console.error('Error closing stream:', e);
-          }
-        }
-      },
+      }
     });
 
     return new Response(stream, {
@@ -154,13 +182,6 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error('Error in chat API:', error);
-    if (controller) {
-      try {
-        controller.close();
-      } catch (e) {
-        console.error('Error closing stream on error:', e);
-      }
-    }
     return NextResponse.json(
       { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }

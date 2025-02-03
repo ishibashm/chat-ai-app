@@ -318,43 +318,47 @@ export const ChatContainer: React.FC = () => {
   const currentChat = getCurrentChat();
 
   return (
-    <div className="flex h-full bg-[#1a1a1a]">
+    <div className="flex h-full">
       {/* サイドバー */}
-      <div className="w-64 bg-[#141414] border-r border-[#2a2a2a] p-4">
-        <button
-          onClick={handleNewChat}
-          className="w-full px-4 py-2 mb-4 bg-[#0ea5e9] text-white rounded-lg hover:bg-[#0284c7] transition-colors"
-        >
-          New Chat
-        </button>
-        <div className="flex gap-2 mb-4">
+      <div className="w-64 bg-gray-900 border-r border-gray-800 flex flex-col">
+        <div className="p-4 border-b border-gray-800">
           <button
-            onClick={handleExportChats}
-            className="flex-1 px-3 py-1.5 bg-[#1e293b] text-white rounded hover:bg-[#2d3a4f] transition-colors text-sm"
-            disabled={!currentChat}
+            onClick={handleNewChat}
+            className="w-full px-4 py-2 mb-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
-            エクスポート
+            New Chat
           </button>
-          <button
-            onClick={handleImportClick}
-            className="flex-1 px-3 py-1.5 bg-[#1e293b] text-white rounded hover:bg-[#2d3a4f] transition-colors text-sm"
-          >
-            インポート
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".json"
-            onChange={handleFileSelect}
-            className="hidden"
-          />
+          <div className="flex gap-2">
+            <button
+              onClick={handleExportChats}
+              className="flex-1 px-3 py-1.5 bg-gray-800 text-white rounded hover:bg-gray-700 transition-colors text-sm"
+              disabled={!currentChat}
+            >
+              エクスポート
+            </button>
+            <button
+              onClick={handleImportClick}
+              className="flex-1 px-3 py-1.5 bg-gray-800 text-white rounded hover:bg-gray-700 transition-colors text-sm"
+            >
+              インポート
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+          </div>
         </div>
+
         {importError && (
-          <div className="mb-4 p-2 text-xs bg-red-500/10 border border-red-500/50 rounded text-red-400">
+          <div className="px-4 py-2 bg-red-500/10 border-y border-red-500/50 text-red-400 text-sm">
             {importError}
           </div>
         )}
-        <div className="space-y-2">
+
+        <div className="flex-1 overflow-y-auto p-4 space-y-2">
           {chatState.chats.map(chat => (
             <ChatTitle
               key={chat.id}
@@ -370,19 +374,26 @@ export const ChatContainer: React.FC = () => {
       </div>
 
       {/* メインチャットエリア */}
-      <div className="flex-1 flex flex-col bg-[#1a1a1a]">
+      <div className="flex-1 flex flex-col bg-gray-900">
         {/* モデルと設定 */}
-        <div className="p-4 border-b border-[#2a2a2a] bg-[#141414] flex items-center justify-between">
-          <select
-            value={currentChat?.model}
-            onChange={(e) => handleModelChange(e.target.value as ModelType)}
-            className="px-4 py-2 bg-[#1a1a1a] text-white border border-[#2a2a2a] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0ea5e9]"
-          >
-            <option value="gpt-4-0125-preview">GPT-4 Turbo</option>
-            <option value="gpt-4">GPT-4</option>
-            <option value="gpt-3.5-turbo">GPT-3.5</option>
-            <option value="claude">Claude</option>
-          </select>
+        <div className="p-4 border-b border-gray-800 bg-gray-900 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <select
+              value={currentChat?.model}
+              onChange={(e) => handleModelChange(e.target.value as ModelType)}
+              className="px-4 py-2 bg-gray-800 text-white border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="gpt-4-0125-preview">GPT-4 Turbo</option>
+              <option value="gpt-4">GPT-4</option>
+              <option value="gpt-3.5-turbo">GPT-3.5</option>
+              <option value="claude">Claude</option>
+              <option value="gemini-pro">Gemini Pro</option>
+            </select>
+            <div className="flex items-center gap-1 text-sm text-gray-400">
+              <span className="w-2 h-2 rounded-full bg-green-400"></span>
+              {currentChat?.model === 'gemini-pro' ? 'Gemini' : currentChat?.model === 'claude' ? 'Claude' : 'OpenAI'}
+            </div>
+          </div>
           <div className="flex items-center space-x-4">
             <label className="text-white text-sm flex items-center space-x-2">
               <input
@@ -392,7 +403,7 @@ export const ChatContainer: React.FC = () => {
                   ...prev,
                   useContext: e.target.checked,
                 }))}
-                className="form-checkbox rounded border-[#2a2a2a] bg-[#1a1a1a]"
+                className="form-checkbox rounded border-gray-700 bg-gray-800"
               />
               <span>Use Context</span>
             </label>
@@ -400,7 +411,7 @@ export const ChatContainer: React.FC = () => {
         </div>
 
         {/* メッセージエリア */}
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-auto p-4 space-y-6">
           {currentChat?.messages.map((message) => (
             <ChatMessage key={message.timestamp} message={message} />
           ))}
@@ -422,7 +433,7 @@ export const ChatContainer: React.FC = () => {
         </div>
 
         {/* 入力エリア */}
-        <div className="border-t border-[#2a2a2a] bg-[#141414]">
+        <div className="border-t border-gray-800 bg-gray-900 p-4">
           <ChatInput
             onSend={handleSendMessage}
             disabled={chatState.isLoading}

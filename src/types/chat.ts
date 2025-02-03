@@ -2,7 +2,8 @@ export type ModelType =
   | 'gpt-4'
   | 'gpt-4-0125-preview'  // GPT-4 Turbo
   | 'gpt-3.5-turbo'
-  | 'claude';
+  | 'claude'
+  | 'gemini-pro';  // Gemini Pro model
 
 export type MessageRole = 'user' | 'assistant' | 'system';
 
