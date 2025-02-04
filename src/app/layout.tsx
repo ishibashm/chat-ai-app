@@ -1,23 +1,29 @@
-import './globals.css'
-import 'katex/dist/katex.min.css'
-import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
+import './globals.css';
+import { ChatProvider } from '@/lib/chatContext';
+import ChatHeader from '@/components/ChatHeader';
 
-const inter = Inter({ subsets: ['latin'] })
+const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: 'AI Chat App',
-  description: 'Chat with GPT-4, GPT-3.5, and Claude',
-}
+  description: 'AI Chat Application',
+};
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
   return (
     <html lang="ja">
-      <body className={inter.className}>{children}</body>
+      <body className={inter.className}>
+        <ChatProvider>
+          <ChatHeader />
+          {children}
+        </ChatProvider>
+      </body>
     </html>
-  )
+  );
 }
