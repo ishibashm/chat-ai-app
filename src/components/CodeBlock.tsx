@@ -58,7 +58,7 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ language, value }) => {
         <SyntaxHighlighter
           language={language}
           style={vscDarkPlus}
-          showLineNumbers={true}
+          showLineNumbers={false}
           wrapLines={true}
           customStyle={{
             margin: 0,

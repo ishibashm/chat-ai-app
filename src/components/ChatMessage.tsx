@@ -65,7 +65,18 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
               p: ({ children }) => {
                 if (typeof children === 'string') {
                   const processed = processText(children);
-                  return <p className="mb-4 leading-relaxed">{processed}</p>;
+                  if (Array.isArray(processed)) {
+                    return (
+                      <div className="space-y-4">
+                        {processed.map((part, index) => {
+                          if (typeof part === 'string') {
+                            return <p key={index} className="leading-relaxed">{part}</p>;
+                          }
+                          return <div key={index}>{part}</div>;
+                        })}
+                      </div>
+                    );
+                  }
                 }
                 return <p className="mb-4 leading-relaxed">{children}</p>;
               },

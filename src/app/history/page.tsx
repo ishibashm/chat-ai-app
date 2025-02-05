@@ -15,7 +15,7 @@ export default function HistoryPage() {
 
   const handleChatSelect = (chatId: string) => {
     setCurrentChatId(chatId);
-    window.location.href = '/';
+    window.location.href = `/chat/${chatId}`;
   };
 
   const handleExport = async () => {
@@ -63,13 +63,13 @@ export default function HistoryPage() {
         <div className="flex items-center space-x-2">
           <button
             onClick={handleExport}
-            className="px-3 py-1 text-sm text-white bg-blue-500 rounded hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-4 py-2 text-white bg-blue-500 rounded-lg hover:bg-blue-600 transition-colors"
           >
             エクスポート
           </button>
           <button
             onClick={handleImport}
-            className="px-3 py-1 text-sm text-white bg-green-500 rounded hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500"
+            className="px-4 py-2 text-white bg-green-500 rounded-lg hover:bg-green-600 transition-colors"
           >
             インポート
           </button>
@@ -114,10 +114,14 @@ export default function HistoryPage() {
           <div className="p-4">
             <div className="grid grid-cols-2 gap-4">
               {chats.map((chat) => (
-                <div
+                <Link
                   key={chat.id}
-                  className="bg-gray-800 rounded-lg p-4 hover:bg-gray-700 cursor-pointer transition-colors"
-                  onClick={() => handleChatSelect(chat.id)}
+                  href={`/chat/${chat.id}`}
+                  className="bg-gray-800 rounded-lg p-4 hover:bg-gray-700 cursor-pointer transition-colors block"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleChatSelect(chat.id);
+                  }}
                 >
                   <div className="flex justify-between items-start mb-2">
                     <h3 className="text-lg font-medium text-white">{chat.title}</h3>
@@ -134,7 +138,7 @@ export default function HistoryPage() {
                       {chat.messages[0].content.length > 100 && '...'}
                     </div>
                   )}
-                </div>
+                </Link>
               ))}
             </div>
           </div>

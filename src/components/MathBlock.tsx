@@ -17,7 +17,11 @@ export const MathBlock: React.FC<MathBlockProps> = ({ math, display = false }) =
 
   return (
     <div
-      className={`${display ? 'math-block' : 'math-inline'}`}
+      className={`${
+        display
+          ? 'math-block my-4 p-2 bg-gray-800 rounded overflow-x-auto'
+          : 'math-inline mx-1'
+      }`}
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );
@@ -38,10 +42,22 @@ export function renderMathInText(text: string): (string | React.ReactElement)[] 
       parts.push(text.slice(lastIndex, index));
     }
     parts.push(
-      <div key={index} className="math-block-wrapper">
-        <div className="math-block-content">
-          <MathBlock key={`math-${index}`} math={math} display={true} />
-        </div>
+      <div key={index} className="my-4">
+        <MathBlock key={`math-${index}`} math={math} display={true} />
+      </div>
+    );
+    lastIndex = index + match.length;
+    return match;
+  });
+
+  // 角括弧で囲まれた数式を処理
+  text.replace(/\[(.*?)\]/g, (match, math, index) => {
+    if (index > lastIndex) {
+      parts.push(text.slice(lastIndex, index));
+    }
+    parts.push(
+      <div key={index} className="my-4">
+        <MathBlock key={`math-${index}`} math={math} display={true} />
       </div>
     );
     lastIndex = index + match.length;
