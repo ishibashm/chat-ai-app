@@ -10,8 +10,8 @@ import { downloadChats, readChatFile } from '@/lib/chatExportImport';
 type TabType = 'search' | 'history';
 
 export default function HistoryPage() {
-  const [activeTab, setActiveTab] = useState<TabType>('search');
   const { chats, setCurrentChatId, exportChats, importChats, settings } = useChatContext();
+  const [activeTab, setActiveTab] = useState<TabType>('search');
 
   const handleChatSelect = (chatId: string) => {
     setCurrentChatId(chatId);
@@ -52,7 +52,7 @@ export default function HistoryPage() {
   return (
     <div className="h-screen flex flex-col bg-gray-900">
       {/* ヘッダー */}
-      <div className="flex justify-between items-center p-4 bg-gray-900 border-b border-gray-800">
+      <div className="sticky top-0 flex justify-between items-center p-4 bg-gray-900 border-b border-gray-800 z-10">
         <div className="flex items-center space-x-4">
           <h1 className="text-xl font-semibold text-white">チャット履歴</h1>
           <div className="text-sm text-gray-400">
@@ -83,7 +83,7 @@ export default function HistoryPage() {
       </div>
 
       {/* タブ切り替え */}
-      <div className="flex border-b border-gray-800 bg-gray-900">
+      <div className="flex border-b border-gray-800 bg-gray-900 sticky top-12 z-10">
         <button
           onClick={() => setActiveTab('search')}
           className={`flex-1 px-6 py-3 text-sm font-medium transition-colors ${
