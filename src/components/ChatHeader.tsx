@@ -83,28 +83,28 @@ export default function ChatHeader() {
   }, {} as Record<ModelType, number>);
 
   return (
-    <div className="flex justify-between items-center p-4 bg-gray-900 border-b border-gray-800">
-      <div className="flex items-center space-x-4">
-        <h1 className="text-xl font-semibold text-white">AIチャット</h1>
-        <div className="text-sm text-gray-400">
+    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 sm:p-4 bg-gray-900 border-b border-gray-800">
+      <div className="flex items-center space-x-2 sm:space-x-4 mb-2 sm:mb-0 pl-12 lg:pl-0">
+        <h1 className="text-lg sm:text-xl font-semibold text-white">AIチャット</h1>
+        <div className="text-xs sm:text-sm text-gray-400">
           全{chats.length}件
         </div>
       </div>
 
-      <div className="flex items-center space-x-4">
-        <div className="flex space-x-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 w-full sm:w-auto">
+        <div className="hidden sm:flex space-x-4">
           {Object.entries(modelCounts).map(([model, count]) => (
-            <div key={model} className="text-sm text-gray-400">
+            <div key={model} className="text-xs sm:text-sm text-gray-400">
               {model}: {count}件
             </div>
           ))}
         </div>
-        <div className="flex space-x-2">
-          <Link href="/history" className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
-            チャット履歴
+        <div className="flex space-x-2 w-full sm:w-auto">
+          <Link href="/history" className="flex-1 sm:flex-none text-center px-3 sm:px-4 py-1.5 sm:py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+            履歴
           </Link>
-          <Link href="/api/export-import" className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors">
-            エクスポート/インポート
+          <Link href="/api/export-import" className="flex-1 sm:flex-none text-center px-3 sm:px-4 py-1.5 sm:py-2 text-sm bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors">
+            エクスポート
           </Link>
         </div>
       </div>
