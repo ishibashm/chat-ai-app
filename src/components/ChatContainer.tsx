@@ -331,7 +331,7 @@ export function ChatContainer() {
         </div>
 
         {/* メッセージエリア */}
-        <div className="flex-1 overflow-y-auto min-h-0 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent">
+        <div className="flex-1 min-h-0">
           <div className="pb-20">
             <div className="py-4 sm:py-6 space-y-4 sm:space-y-6 min-h-full px-4">
               {currentChat?.messages.map((message: Message) => (
