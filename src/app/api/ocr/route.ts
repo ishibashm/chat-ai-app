@@ -7,15 +7,18 @@ export async function POST(request: Request) {
   if (!API_KEY) {
     return NextResponse.json(
       { 
-        error: 'OCR processing failed', 
-        details: 'Google Cloud Vision APIのキーが設定されていません。.envファイルにGOOGLE_CLOUD_API_KEYを設定してください。'
+        text: '',
+        error: 'Google Cloud Vision APIのキーが設定されていません'
       },
-      { status: 500 }
+      { status: 400 }
     );
   }
 
   try {
     const { imageData } = await request.json();
+    if (!imageData) {
+      return NextResponse.json({ text: '' });
+    }
 
     // Base64データからヘッダーを削除
     const base64WithoutHeader = imageData.replace(/^data:image\/[a-z]+;base64,/, '');
@@ -33,7 +36,8 @@ export async function POST(request: Request) {
             },
             features: [
               {
-                type: 'TEXT_DETECTION'
+                type: 'TEXT_DETECTION',
+                maxResults: 1
               }
             ]
           }
@@ -42,15 +46,14 @@ export async function POST(request: Request) {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(`Vision API failed: ${response.status} ${response.statusText}\n${JSON.stringify(error)}`);
+      throw new Error(`Vision API failed: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
     const textAnnotations = data.responses[0]?.textAnnotations;
     
     if (!textAnnotations || textAnnotations.length === 0) {
-      return NextResponse.json({ text: '画像からテキストを検出できませんでした。' });
+      return NextResponse.json({ text: '' });
     }
 
     // 最初の要素が画像全体のテキスト
@@ -61,10 +64,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Error in OCR API:', error);
     return NextResponse.json(
-      { 
-        error: 'OCR processing failed', 
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
+      { text: '', error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }

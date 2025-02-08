@@ -20,14 +20,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled }) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if ((input.trim() || imagePreview) && !disabled && !isProcessing) {
-      // 画像プレビューがある場合、その情報を含めて送信
       let message = input.trim();
       if (imagePreview) {
         const imageMarkdown = `![${imagePreview.name}](${imagePreview.url})\n\n`;
-        if (message) {
-          message = `${imageMarkdown}${message}`;
+        if (imagePreview.ocrText) {
+          message = `${imageMarkdown}検出されたテキスト:\n${imagePreview.ocrText}\n\n${message}`;
         } else {
-          message = imageMarkdown;
+          message = `${imageMarkdown}${message}`;
         }
       }
       onSend(message);
@@ -51,13 +50,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled }) => {
       }
 
       const data = await response.json();
-      if (data.text) {
-        onSend(`![OCR Result](${imageData})\n\n検出されたテキスト:\n${data.text}`);
-      }
-      return data.text;
+      return data.text || '';
     } catch (error) {
       console.error('OCR error:', error);
-      return null;
+      return '';
     }
   };
 
@@ -69,18 +65,18 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled }) => {
       setIsProcessing(true);
 
       if (file.type.startsWith('image/')) {
-        // 画像ファイルの処理
         const reader = new FileReader();
         reader.onload = async (e) => {
           const base64 = e.target?.result as string;
-          setImagePreview({ url: base64, name: file.name });
-          
-          // OCR処理を実行
-          await processImageWithOCR(base64);
+          const ocrText = await processImageWithOCR(base64);
+          setImagePreview({ 
+            url: base64, 
+            name: file.name,
+            ocrText: ocrText || undefined
+          });
         };
         reader.readAsDataURL(file);
       } else {
-        // テキストファイルの処理
         const text = await file.text();
         setInput((prev) => {
           const prefix = prev ? `${prev}\n\n` : '';
@@ -104,14 +100,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled }) => {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-2 p-2 sm:p-4">
-      {/* プレビュー表示エリア */}
       {imagePreview && (
-        <div className="relative">
+        <div className="relative max-h-[300px] overflow-auto">
           <div className="relative group rounded-lg overflow-hidden border border-[#2a2a2a] max-w-[200px]">
             <img
               src={imagePreview.url}
               alt={imagePreview.name}
-              className="w-full h-auto object-contain max-h-[200px]"
+              className="w-full h-auto object-contain max-h-[150px]"
             />
             <button
               type="button"
@@ -134,10 +129,15 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled }) => {
               </svg>
             </button>
           </div>
+          {imagePreview.ocrText && (
+            <div className="mt-2 p-2 bg-[#2a2a2a] rounded text-sm text-[#e2e8f0] max-w-[300px] max-h-[100px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent">
+              <div className="font-medium text-[#0ea5e9] mb-1">検出されたテキスト:</div>
+              <div className="whitespace-pre-wrap">{imagePreview.ocrText}</div>
+            </div>
+          )}
         </div>
       )}
 
-      {/* 入力エリア */}
       <div className="flex gap-2">
         <button
           type="button"
