@@ -1,6 +1,7 @@
 export type ModelType = 
   | 'gpt-4'
   | 'gpt-4-0125-preview'  // GPT-4 Turbo
+  | 'gpt-4-vision-preview'  // GPT-4 Vision
   | 'gpt-3.5-turbo'
   | 'claude'
   | 'gemini-pro';  // Gemini Pro model

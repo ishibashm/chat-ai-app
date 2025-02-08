@@ -8,19 +8,56 @@ interface ChatInputProps {
 interface ImagePreview {
   url: string;
   name: string;
+  ocrText?: string;
 }
 
 export const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled }) => {
   const [input, setInput] = useState('');
   const [imagePreview, setImagePreview] = useState<ImagePreview | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (input.trim() && !disabled) {
-      onSend(input.trim());
+    if ((input.trim() || imagePreview) && !disabled && !isProcessing) {
+      // 画像プレビューがある場合、その情報を含めて送信
+      let message = input.trim();
+      if (imagePreview) {
+        const imageMarkdown = `![${imagePreview.name}](${imagePreview.url})\n\n`;
+        if (message) {
+          message = `${imageMarkdown}${message}`;
+        } else {
+          message = imageMarkdown;
+        }
+      }
+      onSend(message);
       setInput('');
       setImagePreview(null);
+    }
+  };
+
+  const processImageWithOCR = async (imageData: string) => {
+    try {
+      const response = await fetch('/api/ocr', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ imageData }),
+      });
+
+      if (!response.ok) {
+        throw new Error('OCR processing failed');
+      }
+
+      const data = await response.json();
+      if (data.text) {
+        onSend(`![OCR Result](${imageData})\n\n検出されたテキスト:\n${data.text}`);
+      }
+      return data.text;
+    } catch (error) {
+      console.error('OCR error:', error);
+      return null;
     }
   };
 
@@ -29,16 +66,17 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled }) => {
     if (!file) return;
 
     try {
+      setIsProcessing(true);
+
       if (file.type.startsWith('image/')) {
         // 画像ファイルの処理
         const reader = new FileReader();
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
           const base64 = e.target?.result as string;
           setImagePreview({ url: base64, name: file.name });
-          setInput((prev) => {
-            const prefix = prev ? `${prev}\n\n` : '';
-            return `${prefix}![${file.name}](${base64})`;
-          });
+          
+          // OCR処理を実行
+          await processImageWithOCR(base64);
         };
         reader.readAsDataURL(file);
       } else {
@@ -53,7 +91,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled }) => {
       console.error('ファイルの読み込みエラー:', error);
       alert('ファイルの読み込みに失敗しました。');
     } finally {
-      // ファイル選択をリセット（同じファイルを再度選択できるように）
+      setIsProcessing(false);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -62,10 +100,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled }) => {
 
   const removeImagePreview = () => {
     setImagePreview(null);
-    // 入力テキストから画像のMarkdown記法を削除
-    setInput((prev) => 
-      prev.replace(/!\[.*?\]\(data:image\/.*?\)/g, '').trim()
-    );
   };
 
   return (
@@ -108,23 +142,23 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled }) => {
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          disabled={disabled}
+          disabled={disabled || isProcessing}
           className={`px-3 py-2 rounded-lg font-semibold transition-colors text-sm
             min-w-[40px] min-h-[40px] sm:min-h-[44px] flex items-center justify-center
             ${
-              disabled
+              disabled || isProcessing
                 ? 'bg-[#1e293b] text-[#6b7280] cursor-not-allowed'
                 : 'bg-[#1e293b] text-white hover:bg-[#2a3441] active:bg-[#1a2533]'
             }`}
         >
-          📎
+          {isProcessing ? '⏳' : '📎'}
         </button>
         <input
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          disabled={disabled}
-          placeholder="メッセージを入力..."
+          disabled={disabled || isProcessing}
+          placeholder={isProcessing ? '処理中...' : 'メッセージを入力...'}
           className="flex-1 px-3 py-2 sm:p-2 bg-[#1a1a1a] text-white border border-[#2a2a2a] rounded-lg
             placeholder-[#6b7280] focus:outline-none focus:ring-2 focus:ring-[#0ea5e9]
             disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base
@@ -132,11 +166,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled }) => {
         />
         <button
           type="submit"
-          disabled={disabled || !input.trim()}
+          disabled={disabled || (!input && !imagePreview) || isProcessing}
           className={`px-3 sm:px-4 py-2 rounded-lg font-semibold transition-colors text-sm sm:text-base
             min-w-[64px] sm:min-w-[72px] min-h-[40px] sm:min-h-[44px]
             ${
-              disabled || !input.trim()
+              disabled || (!input && !imagePreview) || isProcessing
                 ? 'bg-[#1e293b] text-[#6b7280] cursor-not-allowed'
                 : 'bg-[#0ea5e9] text-white hover:bg-[#0284c7] active:bg-[#0369a1]'
             }`}

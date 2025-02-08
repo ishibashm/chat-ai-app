@@ -6,23 +6,137 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+const MAX_TOKENS_PER_REQUEST = 8000; // 安全マージンを確保
+
+function isBase64Image(str: string) {
+  try {
+    return str.startsWith('data:image/');
+  } catch {
+    return false;
+  }
+}
+
+function truncateMessages(messages: Message[]): Message[] {
+  let totalLength = 0;
+  const result: Message[] = [];
+  
+  // 最後のメッセージは必ず含める
+  const lastMessage = messages[messages.length - 1];
+  
+  // 新しいメッセージから順に追加
+  for (let i = messages.length - 2; i >= 0; i--) {
+    const msg = messages[i];
+    const messageLength = msg.content.length;
+    
+    if (totalLength + messageLength > MAX_TOKENS_PER_REQUEST) {
+      break;
+    }
+    
+    totalLength += messageLength;
+    result.unshift(msg);
+  }
+  
+  // 最後のメッセージを追加
+  result.push(lastMessage);
+  
+  return result;
+}
+
 async function* streamOpenAIResponse(messages: Message[], model: string) {
   try {
-    const response = await openai.chat.completions.create({
-      model: model,
-      messages: messages.map(msg => ({
-        role: msg.role,
-        content: msg.content,
-      })),
-      temperature: 0.7,
-      max_tokens: 1000,
-      stream: true,
-    });
+    // メッセージを制限内に収める
+    const truncatedMessages = truncateMessages(messages);
 
-    for await (const chunk of response) {
-      const content = chunk.choices[0]?.delta?.content;
-      if (content) {
-        yield content;
+    // GPT-4 Visionを使用する場合の処理
+    if (model === 'gpt-4-vision-preview') {
+      const lastMessage = truncatedMessages[truncatedMessages.length - 1];
+      const content: any[] = [];
+
+      // メッセージを解析して画像とテキストを分離
+      const segments = lastMessage.content.split(/(!?\[.*?\]\(data:image\/.*?\))/);
+      let hasImage = false;
+
+      for (const segment of segments) {
+        if (isBase64Image(segment)) {
+          hasImage = true;
+          content.push({
+            type: 'image_url',
+            image_url: {
+              url: segment,
+              detail: 'auto'
+            }
+          });
+        } else if (segment.trim()) {
+          content.push({
+            type: 'text',
+            text: segment.trim()
+          });
+        }
+      }
+
+      if (!hasImage) {
+        // 画像がない場合は通常のモデルを使用
+        const response = await openai.chat.completions.create({
+          model: 'gpt-4',
+          messages: truncatedMessages.map(msg => ({
+            role: msg.role,
+            content: msg.content,
+          })),
+          temperature: 0.7,
+          max_tokens: 1000,
+          stream: true,
+        });
+
+        for await (const chunk of response) {
+          const content = chunk.choices[0]?.delta?.content;
+          if (content) {
+            yield content;
+          }
+        }
+        return;
+      }
+
+      // Vision APIリクエスト
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4-vision-preview',
+        messages: [
+          ...truncatedMessages.slice(0, -1).map(msg => ({
+            role: msg.role,
+            content: msg.content,
+          })),
+          {
+            role: 'user',
+            content: content
+          }
+        ],
+        max_tokens: 1000,
+        stream: true,
+      });
+
+      for await (const chunk of response) {
+        const content = chunk.choices[0]?.delta?.content;
+        if (content) {
+          yield content;
+        }
+      }
+    } else {
+      // 通常のGPTモデルの処理
+      const response = await openai.chat.completions.create({
+        model,
+        messages: truncatedMessages.map(msg => ({
+          role: msg.role,
+          content: msg.content,
+        })),
+        temperature: 0.7,
+        max_tokens: 1000,
+        stream: true,
+      });
+
+      for await (const chunk of response) {
+        const content = chunk.choices[0]?.delta?.content;
+        if (content) {
+          yield content;
+        }
       }
     }
   } catch (error) {
@@ -33,6 +147,16 @@ async function* streamOpenAIResponse(messages: Message[], model: string) {
 
 async function* streamClaudeResponse(messages: Message[]) {
   try {
+    // メッセージを制限内に収める
+    const truncatedMessages = truncateMessages(messages);
+
+    // 最後のメッセージに画像が含まれているか確認
+    const lastMessage = truncatedMessages[truncatedMessages.length - 1];
+    if (isBase64Image(lastMessage.content)) {
+      yield '申し訳ありませんが、Claudeモデルは現在画像の処理に対応していません。テキストのみのメッセージを送信してください。';
+      return;
+    }
+
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -43,7 +167,7 @@ async function* streamClaudeResponse(messages: Message[]) {
       body: JSON.stringify({
         model: 'claude-3-opus-20240229',
         max_tokens: 1000,
-        messages: messages.map(msg => ({
+        messages: truncatedMessages.map(msg => ({
           role: msg.role === 'user' ? 'user' : 'assistant',
           content: msg.content,
         })),
@@ -92,6 +216,9 @@ async function* streamClaudeResponse(messages: Message[]) {
 
 async function* streamGeminiResponse(messages: Message[], request: Request) {
   try {
+    // メッセージを制限内に収める
+    const truncatedMessages = truncateMessages(messages);
+
     const url = new URL(request.url);
     const geminiUrl = new URL('/api/chat/gemini', url.origin);
     const response = await fetch(geminiUrl, {
@@ -99,7 +226,7 @@ async function* streamGeminiResponse(messages: Message[], request: Request) {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ messages }),
+      body: JSON.stringify({ messages: truncatedMessages }),
     });
 
     if (!response.ok) {
@@ -127,12 +254,25 @@ async function* streamGeminiResponse(messages: Message[], request: Request) {
   }
 }
 
-function getModelName(model: ModelType): string {
+function getModelName(model: ModelType, hasImage: boolean): string {
+  if (hasImage) {
+    switch (model) {
+      case 'gpt-4':
+      case 'gpt-4-0125-preview':
+      case 'gpt-3.5-turbo':
+        return 'gpt-4-vision-preview';
+      default:
+        return model;
+    }
+  }
+
   switch (model) {
     case 'gpt-4':
       return 'gpt-4';
     case 'gpt-4-0125-preview':
       return 'gpt-4-0125-preview';
+    case 'gpt-4-vision-preview':
+      return 'gpt-4-vision-preview';
     case 'gpt-3.5-turbo':
       return 'gpt-3.5-turbo';
     case 'claude':
@@ -149,7 +289,12 @@ export async function POST(request: Request) {
 
   try {
     const { messages, model } = await request.json();
-    const modelName = getModelName(model as ModelType);
+    
+    // 画像の有無を確認
+    const lastMessage = messages[messages.length - 1];
+    const hasImage = isBase64Image(lastMessage.content);
+    
+    const modelName = getModelName(model as ModelType, hasImage);
 
     const stream = new ReadableStream<Uint8Array>({
       async start(controller) {
@@ -168,8 +313,15 @@ export async function POST(request: Request) {
           }
           controller.close();
         } catch (error) {
-          console.error('Streaming error:', error);
-          controller.error(error);
+          if (error instanceof Error && error.message.includes('too large')) {
+            controller.enqueue(encoder.encode(
+              '申し訳ありませんが、メッセージが長すぎるため処理できません。より短いメッセージで試してください。'
+            ));
+            controller.close();
+          } else {
+            console.error('Streaming error:', error);
+            controller.error(error);
+          }
         }
       }
     });

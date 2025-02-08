@@ -17,6 +17,30 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
     return parts;
   };
 
+  // OCRテキストを抽出
+  const extractOcrText = (content: string) => {
+    const match = content.match(/検出されたテキスト:\n(.*?)(?=\n\n|$)/s);
+    return match ? match[1] : null;
+  };
+
+  // 画像を抽出（Markdown形式）
+  const extractImages = (content: string) => {
+    const matches = content.matchAll(/!\[([^\]]*)\]\(([^)]+)\)/g);
+    return Array.from(matches).map(match => ({
+      alt: match[1],
+      src: match[2]
+    }));
+  };
+
+  // コンテンツからOCRテキストを除去
+  const cleanContent = (content: string) => {
+    return content.replace(/検出されたテキスト:\n.*?(?=\n\n|$)/s, '').trim();
+  };
+
+  const images = extractImages(message.content);
+  const ocrText = extractOcrText(message.content);
+  const cleanedContent = cleanContent(message.content);
+
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-6`}>
       <div
@@ -36,10 +60,33 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
 
         {/* メッセージコンテンツ */}
         <div className="p-4">
+          {/* 画像の表示 */}
+          {images.length > 0 && (
+            <div className="mb-4 space-y-4">
+              {images.map((img, index) => (
+                <div key={index} className="relative rounded-lg overflow-hidden border border-[#2a2a2a]">
+                  <img
+                    src={img.src}
+                    alt={img.alt}
+                    className="max-w-full h-auto object-contain max-h-[300px]"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* OCRテキストの表示 */}
+          {ocrText && (
+            <div className="mb-4 p-3 bg-[#2a2a2a] rounded-lg text-sm">
+              <div className="font-medium mb-1 text-[#0ea5e9]">検出されたテキスト:</div>
+              <div className="whitespace-pre-wrap">{ocrText}</div>
+            </div>
+          )}
+
+          {/* メインコンテンツ */}
           <ReactMarkdown
             className="prose prose-invert max-w-none"
             components={{
-              // インラインコードの処理
               code: ({ inline, className, children, ...props }) => {
                 const language = className ? className.replace('language-', '') : 'text';
                 const value = String(children).replace(/\n$/, '');
@@ -61,7 +108,6 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
                   </div>
                 );
               },
-              // 段落の処理(数式の処理)
               p: ({ children }) => {
                 if (typeof children === 'string') {
                   const processed = processText(children);
@@ -80,7 +126,6 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
                 }
                 return <p className="mb-4 leading-relaxed">{children}</p>;
               },
-              // 見出しのスタイル
               h1: ({ children }) => (
                 <h1 className="text-xl font-bold mb-4 pb-2 border-b border-[#2a2a2a]">
                   {children}
@@ -96,7 +141,6 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
                   {children}
                 </h3>
               ),
-              // リストのスタイル
               ul: ({ children }) => (
                 <ul className="list-disc list-inside mb-4 space-y-1">
                   {children}
@@ -107,7 +151,6 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
                   {children}
                 </ol>
               ),
-              // 引用のスタイル
               blockquote: ({ children }) => (
                 <blockquote className="border-l-4 border-[#2a2a2a] pl-4 my-4 italic">
                   {children}
@@ -115,7 +158,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
               ),
             }}
           >
-            {message.content}
+            {cleanedContent}
           </ReactMarkdown>
         </div>
       </div>
