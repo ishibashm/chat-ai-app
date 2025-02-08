@@ -1,41 +1,76 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
-import { Message, ModelType, TokenInfo } from '@/types/chat';
+import { Message, ModelType } from '@/types/chat';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-const TOKEN_LIMIT = 8000;
-const WARNING_THRESHOLD = 7000;
+const MAX_TOKENS_PER_REQUEST = 6000; // 安全なマージン
+const MAX_MESSAGES_HISTORY = 10;     // 履歴の制限
 
-// トークン数を概算する関数
-function estimateTokens(text: string): number {
-  // 単純な推定: 英単語は4文字、日本語は2文字で1トークン程度
-  const japanese = text.match(/[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf\u3400-\u4dbf]/g)?.length || 0;
-  const other = text.length - japanese;
-  return Math.ceil(japanese / 2 + other / 4);
+// Base64形式の画像かどうかを判定
+function isBase64Image(str: string) {
+  try {
+    return str.startsWith('data:image/');
+  } catch {
+    return false;
+  }
 }
 
-// トークン情報を取得
-function getTokenInfo(messages: Message[]): TokenInfo {
-  const count = messages.reduce((sum, msg) => sum + estimateTokens(msg.content), 0);
-  return {
-    count,
-    limit: TOKEN_LIMIT,
-    isNearLimit: count > WARNING_THRESHOLD
-  };
+// メッセージ履歴を最適化
+function optimizeMessages(messages: Message[]): Message[] {
+  // 最新のメッセージを優先的に保持
+  if (messages.length > MAX_MESSAGES_HISTORY) {
+    messages = messages.slice(-MAX_MESSAGES_HISTORY);
+  }
+
+  return messages.map(msg => ({
+    role: msg.role,
+    content: optimizeMessageContent(msg.content),
+    timestamp: msg.timestamp,  // タイムスタンプを維持
+  }));
+}
+
+// APIに送信するメッセージを準備
+function prepareApiMessages(messages: Message[]) {
+  return messages.map(msg => ({
+    role: msg.role,
+    content: msg.content,
+  }));
+}
+
+// メッセージ内容を最適化
+function optimizeMessageContent(content: string): string {
+  // Base64画像を [画像] プレースホルダーに置換
+  content = content.replace(/!\[.*?\]\(data:image\/[^)]+\)/g, '[画像]');
+  
+  // OCRテキストを圧縮（重複除去）
+  if (content.includes('検出されたテキスト:')) {
+    const lines = content.split('\n');
+    const ocrTextIndex = lines.findIndex(line => line.includes('検出されたテキスト:'));
+    if (ocrTextIndex >= 0) {
+      const ocrText = lines[ocrTextIndex + 1];
+      // OCRテキストの周辺の空行を削除
+      lines.splice(ocrTextIndex, 2, `検出されたテキスト: ${ocrText.trim()}`);
+      content = lines.join('\n');
+    }
+  }
+
+  return content.trim();
 }
 
 async function* streamOpenAIResponse(messages: Message[], model: string) {
   try {
-    let tokenCount = 0;
-    let needsNewThread = false;
-    let responseBuffer = '';
+    // メッセージを最適化
+    const optimizedMessages = optimizeMessages(messages);
+    const apiMessages = prepareApiMessages(optimizedMessages);
+
+    console.log('送信メッセージ:', JSON.stringify(apiMessages, null, 2));
 
     // GPT-4 Visionを使用する場合の処理
     if (model === 'gpt-4-vision-preview') {
-      const lastMessage = messages[messages.length - 1];
+      const lastMessage = optimizedMessages[optimizedMessages.length - 1];
       const content: any[] = [];
 
       // メッセージを解析して画像とテキストを分離
@@ -43,13 +78,13 @@ async function* streamOpenAIResponse(messages: Message[], model: string) {
       let hasImage = false;
 
       for (const segment of segments) {
-        if (segment.startsWith('data:image/')) {
+        if (isBase64Image(segment)) {
           hasImage = true;
           content.push({
             type: 'image_url',
             image_url: {
               url: segment,
-              detail: 'auto'
+              detail: 'low'  // 画質を下げてトークン数を削減
             }
           });
         } else if (segment.trim()) {
@@ -64,23 +99,15 @@ async function* streamOpenAIResponse(messages: Message[], model: string) {
         // 画像がない場合は通常のモデルを使用
         const response = await openai.chat.completions.create({
           model: 'gpt-4',
-          messages: messages.map(msg => ({
-            role: msg.role,
-            content: msg.content,
-          })),
+          messages: apiMessages,
           temperature: 0.7,
+          max_tokens: 1000,
           stream: true,
         });
 
         for await (const chunk of response) {
           const content = chunk.choices[0]?.delta?.content;
           if (content) {
-            tokenCount += estimateTokens(content);
-            if (tokenCount > TOKEN_LIMIT) {
-              needsNewThread = true;
-              yield '\n\n[続きは新しいスレッドで...]';
-              break;
-            }
             yield content;
           }
         }
@@ -91,27 +118,19 @@ async function* streamOpenAIResponse(messages: Message[], model: string) {
       const response = await openai.chat.completions.create({
         model: 'gpt-4-vision-preview',
         messages: [
-          ...messages.slice(0, -1).map(msg => ({
-            role: msg.role,
-            content: msg.content,
-          })),
+          ...apiMessages.slice(0, -1),
           {
             role: 'user',
             content: content
           }
         ],
+        max_tokens: 1000,
         stream: true,
       });
 
       for await (const chunk of response) {
         const content = chunk.choices[0]?.delta?.content;
         if (content) {
-          tokenCount += estimateTokens(content);
-          if (tokenCount > TOKEN_LIMIT) {
-            needsNewThread = true;
-            yield '\n\n[続きは新しいスレッドで...]';
-            break;
-          }
           yield content;
         }
       }
@@ -119,37 +138,18 @@ async function* streamOpenAIResponse(messages: Message[], model: string) {
       // 通常のGPTモデルの処理
       const response = await openai.chat.completions.create({
         model,
-        messages: messages.map(msg => ({
-          role: msg.role,
-          content: msg.content,
-        })),
+        messages: apiMessages,
         temperature: 0.7,
+        max_tokens: 1000,
         stream: true,
       });
 
       for await (const chunk of response) {
         const content = chunk.choices[0]?.delta?.content;
         if (content) {
-          tokenCount += estimateTokens(content);
-          responseBuffer += content;
-
-          if (tokenCount > TOKEN_LIMIT) {
-            needsNewThread = true;
-            yield '\n\n[続きは新しいスレッドで...]';
-            break;
-          }
           yield content;
         }
       }
-    }
-
-    // トークン制限に達した場合、新しいスレッドの作成をトリガー
-    if (needsNewThread) {
-      yield JSON.stringify({
-        type: 'thread_continuation',
-        tokenCount,
-        remainingContent: responseBuffer
-      });
     }
   } catch (error) {
     console.error('OpenAI streaming error:', error);
@@ -159,9 +159,9 @@ async function* streamOpenAIResponse(messages: Message[], model: string) {
 
 async function* streamClaudeResponse(messages: Message[]) {
   try {
-    let tokenCount = 0;
-    let needsNewThread = false;
-    let responseBuffer = '';
+    // メッセージを最適化
+    const optimizedMessages = optimizeMessages(messages);
+    const apiMessages = prepareApiMessages(optimizedMessages);
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -173,7 +173,7 @@ async function* streamClaudeResponse(messages: Message[]) {
       body: JSON.stringify({
         model: 'claude-3-opus-20240229',
         max_tokens: 1000,
-        messages: messages.map(msg => ({
+        messages: apiMessages.map(msg => ({
           role: msg.role === 'user' ? 'user' : 'assistant',
           content: msg.content,
         })),
@@ -202,16 +202,7 @@ async function* streamClaudeResponse(messages: Message[]) {
             try {
               const data = JSON.parse(line.slice(6));
               if (data.type === 'content_block_delta' && data.delta?.text) {
-                const content = data.delta.text;
-                tokenCount += estimateTokens(content);
-                responseBuffer += content;
-
-                if (tokenCount > TOKEN_LIMIT) {
-                  needsNewThread = true;
-                  yield '\n\n[続きは新しいスレッドで...]';
-                  break;
-                }
-                yield content;
+                yield data.delta.text;
               }
             } catch (e) {
               console.error('Error parsing Claude response:', e);
@@ -219,19 +210,9 @@ async function* streamClaudeResponse(messages: Message[]) {
             }
           }
         }
-
-        if (needsNewThread) break;
       }
     } finally {
       reader.releaseLock();
-    }
-
-    if (needsNewThread) {
-      yield JSON.stringify({
-        type: 'thread_continuation',
-        tokenCount,
-        remainingContent: responseBuffer
-      });
     }
   } catch (error) {
     console.error('Claude streaming error:', error);
@@ -241,9 +222,9 @@ async function* streamClaudeResponse(messages: Message[]) {
 
 async function* streamGeminiResponse(messages: Message[], request: Request) {
   try {
-    let tokenCount = 0;
-    let needsNewThread = false;
-    let responseBuffer = '';
+    // メッセージを最適化
+    const optimizedMessages = optimizeMessages(messages);
+    const apiMessages = prepareApiMessages(optimizedMessages);
 
     const url = new URL(request.url);
     const geminiUrl = new URL('/api/chat/gemini', url.origin);
@@ -252,7 +233,7 @@ async function* streamGeminiResponse(messages: Message[], request: Request) {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ messages }),
+      body: JSON.stringify({ messages: apiMessages }),
     });
 
     if (!response.ok) {
@@ -269,26 +250,10 @@ async function* streamGeminiResponse(messages: Message[], request: Request) {
         if (done) break;
 
         const chunk = decoder.decode(value);
-        tokenCount += estimateTokens(chunk);
-        responseBuffer += chunk;
-
-        if (tokenCount > TOKEN_LIMIT) {
-          needsNewThread = true;
-          yield '\n\n[続きは新しいスレッドで...]';
-          break;
-        }
         yield chunk;
       }
     } finally {
       reader.releaseLock();
-    }
-
-    if (needsNewThread) {
-      yield JSON.stringify({
-        type: 'thread_continuation',
-        tokenCount,
-        remainingContent: responseBuffer
-      });
     }
   } catch (error) {
     console.error('Gemini streaming error:', error);
@@ -332,10 +297,9 @@ export async function POST(request: Request) {
   try {
     const { messages, model } = await request.json();
     
-    // トークン数をチェック
-    const tokenInfo = getTokenInfo(messages);
+    // 画像の有無を確認
     const lastMessage = messages[messages.length - 1];
-    const hasImage = lastMessage.content.includes('data:image/');
+    const hasImage = isBase64Image(lastMessage.content);
     
     const modelName = getModelName(model as ModelType, hasImage);
 
@@ -356,8 +320,15 @@ export async function POST(request: Request) {
           }
           controller.close();
         } catch (error) {
-          console.error('Streaming error:', error);
-          controller.error(error);
+          if (error instanceof Error && error.message.includes('too large')) {
+            controller.enqueue(encoder.encode(
+              '申し訳ありませんが、メッセージが長すぎるため処理できません。より短いメッセージで試してください。'
+            ));
+            controller.close();
+          } else {
+            console.error('Streaming error:', error);
+            controller.error(error);
+          }
         }
       }
     });
