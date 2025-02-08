@@ -1,8 +1,10 @@
 import React, { useState, useRef } from 'react';
+import { ThreadInfo } from '@/types/chat';
 
 interface ChatInputProps {
   onSend: (message: string) => void;
   disabled?: boolean;
+  threadInfo?: ThreadInfo;
 }
 
 interface ImagePreview {
@@ -11,7 +13,11 @@ interface ImagePreview {
   ocrText?: string;
 }
 
-export const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled }) => {
+export const ChatInput: React.FC<ChatInputProps> = ({ 
+  onSend, 
+  disabled,
+  threadInfo 
+}) => {
   const [input, setInput] = useState('');
   const [imagePreview, setImagePreview] = useState<ImagePreview | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -100,6 +106,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled }) => {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-2 p-2 sm:p-4">
+      {threadInfo?.continuation?.fromId && (
+        <div className="px-4 py-2 bg-[#1e293b] text-[#e2e8f0] rounded-lg text-sm">
+          <span className="text-[#0ea5e9]">前のスレッドからの続き</span>
+        </div>
+      )}
+
       {imagePreview && (
         <div className="relative max-h-[300px] overflow-auto">
           <div className="relative group rounded-lg overflow-hidden border border-[#2a2a2a] max-w-[200px]">
@@ -158,7 +170,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled }) => {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           disabled={disabled || isProcessing}
-          placeholder={isProcessing ? '処理中...' : 'メッセージを入力...'}
+          placeholder={
+            threadInfo?.continuation?.fromId
+              ? '前のスレッドからの続きに返信...'
+              : isProcessing 
+                ? '処理中...' 
+                : 'メッセージを入力...'
+          }
           className="flex-1 px-3 py-2 sm:p-2 bg-[#1a1a1a] text-white border border-[#2a2a2a] rounded-lg
             placeholder-[#6b7280] focus:outline-none focus:ring-2 focus:ring-[#0ea5e9]
             disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base

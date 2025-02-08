@@ -6,9 +6,15 @@ import { renderMathInText } from './MathBlock';
 
 interface ChatMessageProps {
   message: Message;
+  onThreadContinue?: () => void;
+  hasThreadContinuation?: boolean;
 }
 
-export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
+export const ChatMessage: React.FC<ChatMessageProps> = ({ 
+  message, 
+  onThreadContinue,
+  hasThreadContinuation 
+}) => {
   const isUser = message.role === 'user';
   const [expandedImage, setExpandedImage] = useState<string | null>(null);
 
@@ -93,6 +99,20 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
             >
               {message.content}
             </ReactMarkdown>
+
+            {/* スレッド継続表示 */}
+            {hasThreadContinuation && (
+              <div className="mt-4 flex items-center space-x-2">
+                <div className="flex-1 border-t border-[#2a2a2a]" />
+                <button
+                  onClick={onThreadContinue}
+                  className="px-4 py-2 bg-[#2a2a2a] rounded-lg text-sm hover:bg-[#3a3a3a] transition-colors"
+                >
+                  続きを表示
+                </button>
+                <div className="flex-1 border-t border-[#2a2a2a]" />
+              </div>
+            )}
           </div>
         </div>
       </div>
