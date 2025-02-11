@@ -100,10 +100,22 @@ export default function ChatHeader() {
           ))}
         </div>
         <div className="flex space-x-2 w-full sm:w-auto">
-          <Link href="/history" className="flex-1 sm:flex-none text-center px-3 sm:px-4 py-1.5 sm:py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+          <Link 
+            href="/history" 
+            className="flex-1 sm:flex-none text-center px-3 sm:px-4 py-1.5 sm:py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+          >
             履歴
           </Link>
-          <Link href="/api/export-import" className="flex-1 sm:flex-none text-center px-3 sm:px-4 py-1.5 sm:py-2 text-sm bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors">
+          <Link 
+            href="/settings/mcp" 
+            className="flex-1 sm:flex-none text-center px-3 sm:px-4 py-1.5 sm:py-2 text-sm bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
+          >
+            MCP設定
+          </Link>
+          <Link 
+            href="/api/export-import" 
+            className="flex-1 sm:flex-none text-center px-3 sm:px-4 py-1.5 sm:py-2 text-sm bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+          >
             エクスポート
           </Link>
         </div>
